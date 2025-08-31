@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fast Barcode Scanner (ZXing-JS)</title>
+    <title>Barcode Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- ZXing-JS Library -->
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
@@ -36,11 +36,10 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+<body class="bg-gradient-to-r from-[#ff3d1a] to-[#ff3d1a] text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
 
     <div class="w-full max-w-2xl text-center p-6 bg-gray-800 rounded-xl shadow-lg">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">Fast EAN-13 Scanner</h1>
-        <p class="text-gray-400 mb-6">Powered by ZXing-JS</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">Barcode Scanner</h1>
 
         <div id="video-container" class="bg-gray-700">
             <video id="video"></video>
@@ -69,7 +68,7 @@
             const formats = [ZXing.BarcodeFormat.EAN_13];
             hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
             
-            // FIX: Pass hints directly into the constructor
+            // Pass hints directly into the constructor
             const codeReader = new ZXing.BrowserMultiFormatReader(hints);
 
             const startButton = document.getElementById('startButton');
@@ -100,16 +99,32 @@
                             // Start decoding from the selected camera
                             codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
                                 if (result) {
-                                    console.log('Barcode detected:', result.text);
-                                    resultElement.textContent = `Detected: ${result.text}`;
+                                    const barcode = result.text;
+                                    console.log('Barcode detected:', barcode);
+                                    resultElement.textContent = `Detected: ${barcode}`;
                                     
                                     // Vibrate for feedback on mobile
                                     if(navigator.vibrate) {
                                         navigator.vibrate(200);
                                     }
 
-                                    // Optional: stop scanning after a successful read
-                                    // stopScan(); 
+                                    // Stop scanning to prevent multiple triggers
+                                    stopScan(); 
+
+                                    // --- Share functionality ---
+                                    if (navigator.share) {
+                                        navigator.share({
+                                            title: 'Barcode Scanned',
+                                            text: `I've scanned a barcode: ${barcode}`,
+                                            url: window.location.href // You can share the app's URL
+                                        })
+                                        .then(() => console.log('Successful share'))
+                                        .catch((error) => console.log('Error sharing', error));
+                                    } else {
+                                        // Fallback for browsers that do not support the Web Share API
+                                        console.log('Web Share API not supported on this browser.');
+                                        alert(`Barcode Scanned: ${barcode}\n(Sharing not supported on this browser)`);
+                                    }
                                 }
                                 if (err && !(err instanceof ZXing.NotFoundException)) {
                                     console.error(err);
