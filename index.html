@@ -64,13 +64,12 @@
             
             const codeReader = new ZXing.BrowserMultiFormatReader(hints);
             const resultElement = document.getElementById('result');
-            let isScanning = false;
+            let isScanning = false; // This flag is now the main controller
 
             console.log('ZXing code reader initialized');
 
             // --- Function to start scanning ---
             function startScan() {
-                if (isScanning) return;
                 isScanning = true;
                 
                 codeReader.listVideoInputDevices()
@@ -82,8 +81,12 @@
                             resultElement.textContent = 'Scanning...';
                             
                             codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
-                                if (result) {
-                                    // A barcode was successfully found
+                                // We only process a result if we are in a "scanning" state.
+                                if (result && isScanning) {
+                                    // --- CRITICAL: Immediately set isScanning to false ---
+                                    // This prevents the code from processing multiple barcodes while the share dialog is open.
+                                    isScanning = false; 
+
                                     const barcode = result.text;
                                     console.log('Barcode detected:', barcode);
                                     resultElement.textContent = `Detected: ${barcode}`;
@@ -92,44 +95,37 @@
                                         navigator.vibrate(200);
                                     }
 
-                                    // Pause scanning while share dialog is open
-                                    codeReader.reset();
-
                                     // --- Share functionality ---
                                     if (navigator.share) {
                                         navigator.share({
                                             text: barcode // Share ONLY the barcode number
                                         })
-                                        .then(() => console.log('Successful share'))
                                         .catch((error) => console.log('Error sharing:', error))
                                         .finally(() => {
-                                            // This block runs after the user shares or cancels.
-                                            // You could restart the scanner here if needed, e.g., by calling startScan() again.
-                                            resultElement.textContent = 'Share complete. Reload page to scan again.';
-                                            isScanning = false;
+                                            // This runs after the user shares or cancels.
+                                            // Now we are ready to scan again.
+                                            resultElement.textContent = 'Ready to scan next item...';
+                                            isScanning = true; // Allow scanning again
                                         });
                                     } else {
-                                        // Fallback for browsers that do not support the Web Share API
                                         alert(`Barcode: ${barcode}\n(Sharing not supported)`);
-                                        isScanning = false;
+                                        resultElement.textContent = 'Ready to scan next item...';
+                                        isScanning = true; // Allow scanning again after alert
                                     }
                                 }
                                 if (err && !(err instanceof ZXing.NotFoundException)) {
                                     console.error(err);
                                     resultElement.textContent = `Error: ${err.message}`;
-                                    isScanning = false;
                                 }
                             });
                         } else {
                            resultElement.textContent = 'No camera found.';
                            console.error('No video input devices found.');
-                           isScanning = false;
                         }
                     })
                     .catch((err) => {
                         resultElement.textContent = 'Camera access denied or error.';
                         console.error('Error accessing camera:', err);
-                        isScanning = false;
                     });
             }
 
