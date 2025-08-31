@@ -28,10 +28,13 @@
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            /* Set a fixed aspect ratio to control height */
+            aspect-ratio: 4 / 3;
         }
         video {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover; /* Fill the container, cropping if necessary */
             display: block;
         }
     </style>
@@ -50,7 +53,7 @@
             <div class="mt-4 text-sm text-gray-500">
                 <p>Position an EAN-13 barcode</p>
                 <p>inside the red rectangle.</p>
-                <p class="mt-1" id="version-display">v1.3</p> <!-- Version Display -->
+                <p class="mt-1" id="version-display">v1.4</p> <!-- Version Display -->
             </div>
         </div>
         
