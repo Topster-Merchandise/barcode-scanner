@@ -48,8 +48,9 @@
                 <div class="viewfinder"></div>
             </div>
             <div class="mt-4 text-sm text-gray-500">
-                <p>Position an EAN-13 barcode inside the red rectangle.</p>
-                <p class="mt-1" id="version-display">v1.2</p> <!-- Version Display -->
+                <p>Position an EAN-13 barcode</p>
+                <p>inside the red rectangle.</p>
+                <p class="mt-1" id="version-display">v1.3</p> <!-- Version Display -->
             </div>
         </div>
         
@@ -57,15 +58,15 @@
         <div id="share-view" class="hidden mt-6">
             <p class="text-lg">Barcode Detected:</p>
             <p id="scanned-barcode" class="text-2xl font-mono bg-gray-700 p-4 rounded-lg my-4"></p>
-            <button id="shareButton" class="w-full px-6 py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow-md transition-all duration-200">
-                แชร์บาร์โค้ด
+            <button id="shareButton" class="w-full px-6 py-2 bg-gradient-to-r from-blue-700 to-blue-700 hover:from-blue-500 hover:to-blue-500 text-white font-bold rounded-lg shadow-md transition-all duration-200">
+                Share
             </button>
              <button id="rescanButton" class="w-full mt-2 px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all duration-200">
                 Scan Again
             </button>
         </div>
         
-        <p id="status-message" class="mt-6 text-lg bg-gray-700 p-4 rounded-lg text-gray-300">Requesting camera access...</p>
+        <p id="status-message" class="hidden mt-6 text-lg bg-gray-700 p-4 rounded-lg text-gray-300">Requesting camera access...</p>
 
     </div>
 
@@ -90,7 +91,7 @@
             function showScannerView() {
                 scannerView.classList.remove('hidden');
                 shareView.classList.add('hidden');
-                statusMessage.classList.add('hidden');
+                statusMessage.classList.add('hidden'); // Keep status hidden on scan view
                 isScanning = true;
             }
 
@@ -99,14 +100,17 @@
                 scannedBarcodeEl.textContent = barcode;
                 scannerView.classList.add('hidden');
                 shareView.classList.remove('hidden');
-                statusMessage.classList.remove('hidden');
-                statusMessage.textContent = `Detected: ${barcode}`;
+                statusMessage.classList.add('hidden'); // Hide redundant status bar on share view
                 isScanning = false;
             }
 
             // --- Main Scan Function ---
             function startScan() {
                 if(isScanning) return;
+                
+                showScannerView(); // Show scanner and hide other elements
+                statusMessage.classList.remove('hidden'); // Show status only for initial loading
+                statusMessage.textContent = 'Requesting camera access...';
                 isScanning = true;
                 
                 codeReader.listVideoInputDevices()
@@ -115,7 +119,6 @@
                         const selectedDeviceId = rearCamera ? rearCamera.deviceId : videoInputDevices[0].deviceId;
 
                         if (videoInputDevices.length > 0) {
-                            showScannerView();
                             statusMessage.textContent = 'Scanning...';
                             
                             codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
