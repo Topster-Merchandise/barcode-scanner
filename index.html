@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Barcode Scanner (ZXing-JS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ZXing-JS Library -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <style>
+        /* Add a simple viewfinder overlay */
+        .viewfinder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 80%;
+            height: 40%;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(255, 0, 0, 0.7);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px; /* Limit max width */
+            margin: auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="w-full max-w-2xl text-center p-6 bg-gray-800 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">Fast EAN-13 Scanner</h1>
+        <p class="text-gray-400 mb-6">Powered by ZXing-JS</p>
+
+        <div id="video-container" class="bg-gray-700">
+            <video id="video"></video>
+            <div class="viewfinder"></div>
+        </div>
+
+        <div id="result-container" class="mt-6 text-lg">
+            <p id="result" class="bg-gray-700 p-4 rounded-lg text-gray-300">Awaiting camera access...</p>
+        </div>
+
+        <div class="flex gap-4 justify-center mt-6">
+            <button id="startButton" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-all duration-200 w-32">Start</button>
+            <button id="stopButton" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-all duration-200 w-32" disabled>Stop</button>
+        </div>
+
+        <div class="mt-4 text-sm text-gray-500">
+            <p>Position an EAN-13 barcode inside the red rectangle.</p>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function () {
+            let selectedDeviceId;
+            const hints = new Map();
+            // We are only interested in EAN-13 barcodes
+            const formats = [ZXing.BarcodeFormat.EAN_13];
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+            
+            // FIX: Pass hints directly into the constructor
+            const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            const resultElement = document.getElementById('result');
+
+            let isScanning = false;
+
+            console.log('ZXing code reader initialized');
+
+            // --- Function to start scanning ---
+            function startScan() {
+                if (isScanning) return;
+                
+                // Get the rear camera if available
+                codeReader.listVideoInputDevices()
+                    .then((videoInputDevices) => {
+                        // Prefer the rear camera ('environment')
+                        const rearCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment'));
+                        selectedDeviceId = rearCamera ? rearCamera.deviceId : videoInputDevices[0].deviceId;
+
+                        if (videoInputDevices.length > 0) {
+                            isScanning = true;
+                            resultElement.textContent = 'Scanning...';
+                            startButton.disabled = true;
+                            stopButton.disabled = false;
+
+                            // Start decoding from the selected camera
+                            codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+                                if (result) {
+                                    console.log('Barcode detected:', result.text);
+                                    resultElement.textContent = `Detected: ${result.text}`;
+                                    
+                                    // Vibrate for feedback on mobile
+                                    if(navigator.vibrate) {
+                                        navigator.vibrate(200);
+                                    }
+
+                                    // Optional: stop scanning after a successful read
+                                    // stopScan(); 
+                                }
+                                if (err && !(err instanceof ZXing.NotFoundException)) {
+                                    console.error(err);
+                                    resultElement.textContent = `Error: ${err.message}`;
+                                    stopScan(); // Stop on error
+                                }
+                            });
+                        } else {
+                           resultElement.textContent = 'No camera found.';
+                           console.error('No video input devices found.');
+                        }
+                    })
+                    .catch((err) => {
+                        resultElement.textContent = 'Could not access camera.';
+                        console.error('Error listing video devices:', err);
+                    });
+            }
+
+            // --- Function to stop scanning ---
+            function stopScan() {
+                if (!isScanning) return;
+                
+                codeReader.reset(); // This stops the camera and scanning process
+                resultElement.textContent = 'Scanner stopped.';
+                isScanning = false;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                console.log('Scanner stopped');
+            }
+
+            // --- Event Listeners ---
+            startButton.addEventListener('click', startScan);
+            stopButton.addEventListener('click', stopScan);
+
+            // Initial State
+            resultElement.textContent = 'Press Start to scan.';
+        });
+    </script>
+</body>
+</html>
