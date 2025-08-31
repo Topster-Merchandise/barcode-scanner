@@ -114,16 +114,14 @@
                                     // --- Share functionality ---
                                     if (navigator.share) {
                                         navigator.share({
-                                            title: 'Barcode Scanned',
-                                            text: `I've scanned a barcode: ${barcode}`,
-                                            url: window.location.href // You can share the app's URL
+                                            text: barcode // แชร์เฉพาะตัวเลขบาร์โค้ด
                                         })
                                         .then(() => console.log('Successful share'))
                                         .catch((error) => console.log('Error sharing', error));
                                     } else {
                                         // Fallback for browsers that do not support the Web Share API
                                         console.log('Web Share API not supported on this browser.');
-                                        alert(`Barcode Scanned: ${barcode}\n(Sharing not supported on this browser)`);
+                                        alert(`Barcode: ${barcode}\n(Sharing not supported on this browser)`);
                                     }
                                 }
                                 if (err && !(err instanceof ZXing.NotFoundException)) {
