@@ -41,93 +41,123 @@
     <div class="w-full max-w-2xl text-center p-6 bg-gray-800 rounded-xl shadow-lg">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">Barcode Scanner</h1>
 
-        <div id="video-container" class="bg-gray-700">
-            <video id="video"></video>
-            <div class="viewfinder"></div>
+        <!-- Scanning View -->
+        <div id="scanner-view">
+            <div id="video-container" class="bg-gray-700">
+                <video id="video"></video>
+                <div class="viewfinder"></div>
+            </div>
+            <div class="mt-4 text-sm text-gray-500">
+                <p>Position an EAN-13 barcode inside the red rectangle.</p>
+                <p class="mt-1" id="version-display">v1.1</p> <!-- Version Display -->
+            </div>
         </div>
+        
+        <!-- Result and Share View (Initially Hidden) -->
+        <div id="share-view" class="hidden mt-6">
+            <p class="text-lg">Barcode Detected:</p>
+            <p id="scanned-barcode" class="text-2xl font-mono bg-gray-700 p-4 rounded-lg my-4"></p>
+            <button id="shareButton" class="w-full px-6 py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow-md transition-all duration-200">
+                แชร์บาร์โค้ด
+            </button>
+             <button id="rescanButton" class="w-full mt-2 px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all duration-200">
+                Scan Again
+            </button>
+        </div>
+        
+        <p id="status-message" class="mt-6 text-lg bg-gray-700 p-4 rounded-lg text-gray-300">Requesting camera access...</p>
 
-        <div id="result-container" class="mt-6 text-lg">
-            <p id="result" class="bg-gray-700 p-4 rounded-lg text-gray-300">Requesting camera access...</p>
-        </div>
-
-        <div class="mt-4 text-sm text-gray-500">
-            <p>Position an EAN-13 barcode inside the red rectangle.</p>
-        </div>
     </div>
 
     <script>
         window.addEventListener('load', function () {
-            let selectedDeviceId;
-            const hints = new Map();
-            const formats = [ZXing.BarcodeFormat.EAN_13];
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+            const codeReader = new ZXing.BrowserMultiFormatReader(new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]]]));
             
-            const codeReader = new ZXing.BrowserMultiFormatReader(hints);
-            const resultElement = document.getElementById('result');
-            let isScanning = false; // This flag is now the main controller
+            // --- UI Elements ---
+            const statusMessage = document.getElementById('status-message');
+            const scannerView = document.getElementById('scanner-view');
+            const shareView = document.getElementById('share-view');
+            const shareButton = document.getElementById('shareButton');
+            const rescanButton = document.getElementById('rescanButton');
+            const scannedBarcodeEl = document.getElementById('scanned-barcode');
+
+            let isScanning = false;
+            let lastScannedBarcode = null;
 
             console.log('ZXing code reader initialized');
 
-            // --- Function to start scanning ---
+            // --- Function to switch between views ---
+            function showScannerView() {
+                scannerView.classList.remove('hidden');
+                shareView.classList.add('hidden');
+                statusMessage.classList.add('hidden');
+                isScanning = true;
+            }
+
+            function showShareView(barcode) {
+                lastScannedBarcode = barcode;
+                scannedBarcodeEl.textContent = barcode;
+                scannerView.classList.add('hidden');
+                shareView.classList.remove('hidden');
+                statusMessage.classList.remove('hidden');
+                statusMessage.textContent = `Detected: ${barcode}`;
+                isScanning = false;
+            }
+
+            // --- Main Scan Function ---
             function startScan() {
+                if(isScanning) return;
                 isScanning = true;
                 
                 codeReader.listVideoInputDevices()
                     .then((videoInputDevices) => {
                         const rearCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment'));
-                        selectedDeviceId = rearCamera ? rearCamera.deviceId : videoInputDevices[0].deviceId;
+                        const selectedDeviceId = rearCamera ? rearCamera.deviceId : videoInputDevices[0].deviceId;
 
                         if (videoInputDevices.length > 0) {
-                            resultElement.textContent = 'Scanning...';
+                            showScannerView();
+                            statusMessage.textContent = 'Scanning...';
                             
                             codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
-                                // We only process a result if we are in a "scanning" state.
                                 if (result && isScanning) {
-                                    // --- CRITICAL: Immediately set isScanning to false ---
-                                    // This prevents the code from processing multiple barcodes while the share dialog is open.
-                                    isScanning = false; 
-
-                                    const barcode = result.text;
-                                    console.log('Barcode detected:', barcode);
-                                    resultElement.textContent = `Detected: ${barcode}`;
-                                    
-                                    if(navigator.vibrate) {
-                                        navigator.vibrate(200);
-                                    }
-
-                                    // --- Share functionality ---
-                                    if (navigator.share) {
-                                        navigator.share({
-                                            text: barcode // Share ONLY the barcode number
-                                        })
-                                        .catch((error) => console.log('Error sharing:', error))
-                                        .finally(() => {
-                                            // This runs after the user shares or cancels.
-                                            // Now we are ready to scan again.
-                                            resultElement.textContent = 'Ready to scan next item...';
-                                            isScanning = true; // Allow scanning again
-                                        });
-                                    } else {
-                                        alert(`Barcode: ${barcode}\n(Sharing not supported)`);
-                                        resultElement.textContent = 'Ready to scan next item...';
-                                        isScanning = true; // Allow scanning again after alert
-                                    }
+                                    if(navigator.vibrate) navigator.vibrate(200);
+                                    showShareView(result.text);
                                 }
                                 if (err && !(err instanceof ZXing.NotFoundException)) {
+                                    statusMessage.textContent = `Error: ${err.message}`;
                                     console.error(err);
-                                    resultElement.textContent = `Error: ${err.message}`;
                                 }
                             });
                         } else {
-                           resultElement.textContent = 'No camera found.';
-                           console.error('No video input devices found.');
+                           statusMessage.textContent = 'No camera found.';
                         }
                     })
                     .catch((err) => {
-                        resultElement.textContent = 'Camera access denied or error.';
+                        statusMessage.textContent = 'Camera access denied or error.';
                         console.error('Error accessing camera:', err);
                     });
             }
+
+            // --- Event Listeners ---
+            shareButton.addEventListener('click', () => {
+                if (!lastScannedBarcode) return;
+                
+                if (navigator.share) {
+                    navigator.share({ text: lastScannedBarcode })
+                        .catch((error) => console.log('Error sharing:', error))
+                        .finally(() => {
+                            // After sharing, go back to scanning view
+                            startScan();
+                        });
+                } else {
+                    alert(`Barcode: ${lastScannedBarcode}\n(Sharing not supported)`);
+                    startScan(); // Go back to scanning after alert
+                }
+            });
+            
+            rescanButton.addEventListener('click', () => {
+                startScan();
+            });
 
             // --- Automatically start scanning when the page loads ---
             startScan();
