@@ -47,12 +47,7 @@
         </div>
 
         <div id="result-container" class="mt-6 text-lg">
-            <p id="result" class="bg-gray-700 p-4 rounded-lg text-gray-300">Awaiting camera access...</p>
-        </div>
-
-        <div class="flex gap-4 justify-center mt-6">
-            <button id="startButton" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-all duration-200 w-32">Start</button>
-            <button id="stopButton" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-all duration-200 w-32" disabled>Stop</button>
+            <p id="result" class="bg-gray-700 p-4 rounded-lg text-gray-300">Requesting camera access...</p>
         </div>
 
         <div class="mt-4 text-sm text-gray-500">
@@ -64,17 +59,11 @@
         window.addEventListener('load', function () {
             let selectedDeviceId;
             const hints = new Map();
-            // We are only interested in EAN-13 barcodes
             const formats = [ZXing.BarcodeFormat.EAN_13];
             hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
             
-            // Pass hints directly into the constructor
             const codeReader = new ZXing.BrowserMultiFormatReader(hints);
-
-            const startButton = document.getElementById('startButton');
-            const stopButton = document.getElementById('stopButton');
             const resultElement = document.getElementById('result');
-
             let isScanning = false;
 
             console.log('ZXing code reader initialized');
@@ -82,83 +71,70 @@
             // --- Function to start scanning ---
             function startScan() {
                 if (isScanning) return;
+                isScanning = true;
                 
-                // Get the rear camera if available
                 codeReader.listVideoInputDevices()
                     .then((videoInputDevices) => {
-                        // Prefer the rear camera ('environment')
                         const rearCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment'));
                         selectedDeviceId = rearCamera ? rearCamera.deviceId : videoInputDevices[0].deviceId;
 
                         if (videoInputDevices.length > 0) {
-                            isScanning = true;
                             resultElement.textContent = 'Scanning...';
-                            startButton.disabled = true;
-                            stopButton.disabled = false;
-
-                            // Start decoding from the selected camera
+                            
                             codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
                                 if (result) {
+                                    // A barcode was successfully found
                                     const barcode = result.text;
                                     console.log('Barcode detected:', barcode);
                                     resultElement.textContent = `Detected: ${barcode}`;
                                     
-                                    // Vibrate for feedback on mobile
                                     if(navigator.vibrate) {
                                         navigator.vibrate(200);
                                     }
 
-                                    // Stop scanning to prevent multiple triggers
-                                    stopScan(); 
+                                    // Pause scanning while share dialog is open
+                                    codeReader.reset();
 
                                     // --- Share functionality ---
                                     if (navigator.share) {
                                         navigator.share({
-                                            text: barcode // แชร์เฉพาะตัวเลขบาร์โค้ด
+                                            text: barcode // Share ONLY the barcode number
                                         })
                                         .then(() => console.log('Successful share'))
-                                        .catch((error) => console.log('Error sharing', error));
+                                        .catch((error) => console.log('Error sharing:', error))
+                                        .finally(() => {
+                                            // This block runs after the user shares or cancels.
+                                            // You could restart the scanner here if needed, e.g., by calling startScan() again.
+                                            resultElement.textContent = 'Share complete. Reload page to scan again.';
+                                            isScanning = false;
+                                        });
                                     } else {
                                         // Fallback for browsers that do not support the Web Share API
-                                        console.log('Web Share API not supported on this browser.');
-                                        alert(`Barcode: ${barcode}\n(Sharing not supported on this browser)`);
+                                        alert(`Barcode: ${barcode}\n(Sharing not supported)`);
+                                        isScanning = false;
                                     }
                                 }
                                 if (err && !(err instanceof ZXing.NotFoundException)) {
                                     console.error(err);
                                     resultElement.textContent = `Error: ${err.message}`;
-                                    stopScan(); // Stop on error
+                                    isScanning = false;
                                 }
                             });
                         } else {
                            resultElement.textContent = 'No camera found.';
                            console.error('No video input devices found.');
+                           isScanning = false;
                         }
                     })
                     .catch((err) => {
-                        resultElement.textContent = 'Could not access camera.';
-                        console.error('Error listing video devices:', err);
+                        resultElement.textContent = 'Camera access denied or error.';
+                        console.error('Error accessing camera:', err);
+                        isScanning = false;
                     });
             }
 
-            // --- Function to stop scanning ---
-            function stopScan() {
-                if (!isScanning) return;
-                
-                codeReader.reset(); // This stops the camera and scanning process
-                resultElement.textContent = 'Scanner stopped.';
-                isScanning = false;
-                startButton.disabled = false;
-                stopButton.disabled = true;
-                console.log('Scanner stopped');
-            }
-
-            // --- Event Listeners ---
-            startButton.addEventListener('click', startScan);
-            stopButton.addEventListener('click', stopScan);
-
-            // Initial State
-            resultElement.textContent = 'Press Start to scan.';
+            // --- Automatically start scanning when the page loads ---
+            startScan();
         });
     </script>
 </body>
