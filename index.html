@@ -13,8 +13,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 80%;
-            height: 40%;
+            width: 90%; /* <-- ปรับความกว้างแนวนอนที่นี่ */
+            height: 70%; /* <-- ปรับความสูงแนวตั้งที่นี่ */
             transform: translate(-50%, -50%);
             border: 2px solid rgba(255, 0, 0, 0.7);
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
@@ -29,7 +29,7 @@
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             /* Set a fixed aspect ratio to control height */
-            aspect-ratio: 4 / 3;
+            aspect-ratio: 2 / 1; /* <-- ปรับสัดส่วนภาพที่นี่ (ปรับจาก 4 / 3) */
         }
         video {
             width: 100%;
@@ -42,7 +42,7 @@
 <body class="bg-gradient-to-r from-[#ff3d1a] to-[#ff3d1a] text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
 
     <div class="w-full max-w-2xl text-center p-6 bg-gray-800 rounded-xl shadow-lg">
-        <h1 class="text-3xl font-bold mb-2">Barcode Scanner</h1>
+        <h1 class="text-3xl font-bold mb-4">Barcode Scanner</h1>
 
         <!-- Scanning View -->
         <div id="scanner-view">
@@ -84,6 +84,7 @@
             const shareButton = document.getElementById('shareButton');
             const rescanButton = document.getElementById('rescanButton');
             const scannedBarcodeEl = document.getElementById('scanned-barcode');
+            const videoEl = document.getElementById('video'); // Get video element
 
             let isScanning = false;
             let lastScannedBarcode = null;
@@ -134,6 +135,43 @@
                                     console.error(err);
                                 }
                             });
+
+                            // --- ZOOM CONTROL ---
+                            // Wait for the video metadata to load to ensure the stream is active
+                            videoEl.addEventListener('loadedmetadata', () => {
+                                const stream = videoEl.srcObject;
+                                if (!stream || !stream.active) {
+                                    console.log("Stream not ready for zoom control.");
+                                    return;
+                                }
+                                const [videoTrack] = stream.getVideoTracks();
+                                if (!videoTrack) {
+                                    console.log("No video track found.");
+                                    return;
+                                }
+                                
+                                // Check capabilities of the track
+                                const capabilities = videoTrack.getCapabilities();
+                                console.log("Camera capabilities:", capabilities);
+
+                                // Check if zoom is supported
+                                if (capabilities.zoom) {
+                                    // SET YOUR DESIRED ZOOM LEVEL HERE
+                                    const desiredZoom = 2; // Example: 2x zoom
+
+                                    // Make sure desired zoom is within the allowed range
+                                    const zoomValue = Math.max(capabilities.zoom.min, Math.min(desiredZoom, capabilities.zoom.max));
+
+                                    videoTrack.applyConstraints({
+                                        advanced: [{ zoom: zoomValue }]
+                                    })
+                                    .then(() => console.log(`Zoom set to ${zoomValue}x`))
+                                    .catch(err => console.error("Could not apply zoom:", err));
+                                } else {
+                                    console.log('Zoom is not supported by this camera.');
+                                }
+                            }, { once: true }); // Use { once: true } so this event listener only fires once per stream
+
                         } else {
                            statusMessage.textContent = 'No camera found.';
                         }
@@ -156,6 +194,9 @@
                             startScan();
                         });
                 } else {
+                    // Fallback for browsers that don't support navigator.share
+                    // Using a custom modal or simply copying to clipboard would be better than alert()
+                    // But for this example, we'll keep it simple.
                     alert(`Barcode: ${lastScannedBarcode}\n(Sharing not supported)`);
                     startScan(); // Go back to scanning after alert
                 }
